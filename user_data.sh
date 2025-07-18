@@ -11,14 +11,14 @@ systemctl enable docker
 # ec2-user를 docker 그룹에 추가
 usermod -a -G docker ec2-user
 
-# MySQL Docker 컨테이너 실행
+# MySQL 8.0 Docker 컨테이너 실행 (ARM64 지원)
 docker run -d \
   --name mysql-container \
   --restart unless-stopped \
   -e MYSQL_ROOT_PASSWORD="${mysql_password}" \
   -e MYSQL_DATABASE=team_practice_db \
   -p 3306:3306 \
-  mysql:5.7
+  mysql:8.0
 
 # MySQL이 시작될 때까지 대기
 sleep 30
