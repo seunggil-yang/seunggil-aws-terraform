@@ -1,6 +1,6 @@
 # VPC
 resource "aws_vpc" "main" {
-  cidr_block           = "10.0.0.0/16"  # 직접 값 사용
+  cidr_block           = var.vpc_cidr
   enable_dns_hostnames = true
   enable_dns_support   = true
 
@@ -102,4 +102,101 @@ resource "aws_route_table_association" "private" {
   count          = length(aws_subnet.private)
   subnet_id      = aws_subnet.private[count.index].id
   route_table_id = aws_route_table.private.id
+}
+
+# Security Group for EC2 (MySQL)
+resource "aws_security_group" "ec2_mysql" {
+  name_prefix = "${var.project_name}-sg-ec2-"
+  vpc_id      = aws_vpc.main.id
+
+  # MySQL 포트 (Lambda에서 접근)
+  ingress {
+    from_port   = 3306
+    to_port     = 3306
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]  # VPC 내부에서만 접근
+  }
+
+  # 아웃바운드 트래픽 (Docker 이미지 다운로드 등)
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "${var.project_name}-sg-01"
+  }
+}
+
+# IAM Role for EC2 (Session Manager)
+resource "aws_iam_role" "ec2_role" {
+  name = "${var.project_name}-ec2-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+      }
+    ]
+  })
+
+  tags = {
+    Name = "${var.project_name}-ec2-role"
+  }
+}
+
+# IAM Role Policy Attachment for Session Manager
+resource "aws_iam_role_policy_attachment" "ec2_ssm" {
+  role       = aws_iam_role.ec2_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+# IAM Instance Profile
+resource "aws_iam_instance_profile" "ec2_profile" {
+  name = "${var.project_name}-ec2-profile"
+  role = aws_iam_role.ec2_role.name
+
+  tags = {
+    Name = "${var.project_name}-ec2-profile"
+  }
+}
+
+# 최신 Amazon Linux 2023 ARM64 AMI 검색
+data "aws_ami" "amazon_linux" {
+  most_recent = true
+  owners      = ["amazon"]
+
+  filter {
+    name   = "name"
+    values = ["al2023-ami-*-arm64"]
+  }
+
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+}
+
+# EC2 Instance
+resource "aws_instance" "mysql_server" {
+  ami                    = data.aws_ami.amazon_linux.id  # 자동으로 최신 ARM64 AMI 사용
+  instance_type          = "t4g.nano"
+  subnet_id              = aws_subnet.private[0].id
+  vpc_security_group_ids = [aws_security_group.ec2_mysql.id]
+  iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
+
+  user_data = base64encode(templatefile("${path.module}/user_data.sh", {
+    mysql_password = var.mysql_password
+  }))
+
+  tags = {
+    Name = "${var.project_name}-ec2-01"
+  }
 }

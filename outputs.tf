@@ -32,3 +32,18 @@ output "nat_gateway_id" {
   description = "NAT Gateway ID"
   value       = aws_nat_gateway.main.id
 }
+
+output "ec2_instance_id" {
+  description = "EC2 instance ID"
+  value       = aws_instance.mysql_server.id
+}
+
+output "ec2_private_ip" {
+  description = "EC2 private IP"
+  value       = aws_instance.mysql_server.private_ip
+}
+
+output "security_group_id" {
+  description = "Security group ID for EC2"
+  value       = aws_security_group.ec2_mysql.id
+}
