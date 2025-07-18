@@ -1,0 +1,52 @@
+# Terraform 관련 파일들
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+
+# Terraform 디렉토리
+.terraform/
+.terraform.lock.hcl
+
+# Crash log files
+crash.log
+crash.*.log
+
+# Override files
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Terraform plan files
+*.tfplan
+*.tfplan.*
+
+# CLI configuration files
+.terraformrc
+terraform.rc
+
+# 민감한 정보가 포함된 파일들
+secrets.tf
+secret.tfvars
+
+# AWS 자격증명
+.aws/
+aws-credentials.txt
+
+# IDE 관련
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+
+# 로그 파일
+*.log
+
+# 백업 파일
+*.backup
+*.bak
