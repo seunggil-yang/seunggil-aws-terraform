@@ -57,3 +57,13 @@ output "lambda_function_arn" {
   description = "Lambda function ARN"
   value       = aws_lambda_function.main.arn
 }
+
+output "api_gateway_url" {
+  description = "API Gateway URL"
+  value       = "${aws_api_gateway_deployment.main.invoke_url}/team-info"
+}
+
+output "api_gateway_id" {
+  description = "API Gateway ID"
+  value       = aws_api_gateway_rest_api.main.id
+}
