@@ -47,3 +47,13 @@ output "security_group_id" {
   description = "Security group ID for EC2"
   value       = aws_security_group.ec2_mysql.id
 }
+
+output "lambda_function_name" {
+  description = "Lambda function name"
+  value       = aws_lambda_function.main.function_name
+}
+
+output "lambda_function_arn" {
+  description = "Lambda function ARN"
+  value       = aws_lambda_function.main.arn
+}

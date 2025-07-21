@@ -200,3 +200,112 @@ resource "aws_instance" "mysql_server" {
     Name = "${var.project_name}-ec2-01"
   }
 }
+
+# Lambda용 Security Group
+resource "aws_security_group" "lambda_sg" {
+  name_prefix = "${var.project_name}-sg-lambda-"
+  vpc_id      = aws_vpc.main.id
+
+  # 아웃바운드 트래픽 (MySQL 및 AWS API 호출)
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "${var.project_name}-sg-lambda"
+  }
+}
+
+# Lambda 실행 역할
+resource "aws_iam_role" "lambda_role" {
+  name = "${var.project_name}-lambda-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+      }
+    ]
+  })
+
+  tags = {
+    Name = "${var.project_name}-lambda-role"
+  }
+}
+
+# Lambda 기본 실행 권한
+resource "aws_iam_role_policy_attachment" "lambda_basic" {
+  role       = aws_iam_role.lambda_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+}
+
+# Lambda EC2 조회 권한
+resource "aws_iam_role_policy" "lambda_ec2_policy" {
+  name = "${var.project_name}-lambda-ec2-policy"
+  role = aws_iam_role.lambda_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ec2:DescribeInstances",
+          "ec2:DescribeInstanceTypes"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+# Lambda 함수 코드 ZIP 생성
+data "archive_file" "lambda_zip" {
+  type        = "zip"
+  source_file = "${path.module}/lambda_function.py"
+  output_path = "${path.module}/lambda_function.zip"
+}
+
+# Lambda 함수
+resource "aws_lambda_function" "main" {
+  filename         = data.archive_file.lambda_zip.output_path
+  function_name    = "${var.project_name}-lambda-01"
+  role            = aws_iam_role.lambda_role.arn
+  handler         = "lambda_function.lambda_handler"
+  runtime         = "python3.9"
+  timeout         = 30
+  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+
+  # VPC 설정
+  vpc_config {
+    subnet_ids         = aws_subnet.private[*].id
+    security_group_ids = [aws_security_group.lambda_sg.id]
+  }
+
+  # 환경 변수
+  environment {
+    variables = {
+      MYSQL_HOST     = aws_instance.mysql_server.private_ip
+      MYSQL_PASSWORD = var.mysql_password
+      REGION         = var.aws_region  # AWS_REGION 대신 REGION 사용
+    }
+  }
+
+  # PyMySQL 레이어 (별도 설정 필요)
+  depends_on = [
+    aws_iam_role_policy_attachment.lambda_basic,
+    data.archive_file.lambda_zip
+  ]
+
+  tags = {
+    Name = "${var.project_name}-lambda-01"
+  }
+}
